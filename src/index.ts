@@ -1,19 +1,36 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { YoutubeService } from "./services/youtube.service.js";
 import { DownloadService } from "./services/download.service.js";
 import { promptUser } from "./utils/process.js";
 
 const args = process.argv.slice(2);
 
+function getVersion(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkg = JSON.parse(readFileSync(join(here, "../package.json"), "utf8"));
+  return pkg.version;
+}
+
 function printUsage(): void {
   console.log("usage: youtube <mp3|mp4> <url>");
+  console.log("       youtube --version");
   console.log("");
   console.log("commands:");
   console.log("  mp3 <url>    download audio as mp3");
   console.log("  mp4 <url>    download video as mp4 with format selection");
+  console.log("options:");
+  console.log("  -v, --version   print version");
 }
 
 async function main(): Promise<void> {
+  if (args.includes("--version") || args.includes("-v")) {
+    console.log(`youtube ${getVersion()}`);
+    return;
+  }
+
   if (args.length < 2) {
     printUsage();
     process.exit(1);

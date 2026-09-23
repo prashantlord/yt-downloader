@@ -1,11 +1,11 @@
 import { spawn } from "node:child_process";
 import * as path from "node:path";
 import * as CliProgress from "cli-progress";
-
-const DOWNLOAD_DIR = "/mnt/c/Users/Prashant/Downloads";
+import { getDownloadDir } from "../utils/paths.js";
 
 export class DownloadService {
   private progressBar: CliProgress.SingleBar;
+  private downloadDir: string;
 
   constructor() {
     this.progressBar = new CliProgress.SingleBar(
@@ -17,6 +17,7 @@ export class DownloadService {
       },
       CliProgress.Presets.shades_classic
     );
+    this.downloadDir = getDownloadDir();
   }
 
   async downloadMp3(url: string): Promise<string> {
@@ -27,7 +28,7 @@ export class DownloadService {
       "--audio-quality",
       "0",
       "-o",
-      path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s"),
+      path.join(this.downloadDir, "%(title)s.%(ext)s"),
       "--newline",
       url,
     ];
@@ -42,7 +43,7 @@ export class DownloadService {
       "--merge-output-format",
       "mp4",
       "-o",
-      path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s"),
+      path.join(this.downloadDir, "%(title)s.%(ext)s"),
       "--newline",
       url,
     ];
@@ -108,7 +109,7 @@ export class DownloadService {
         this.getDownloadedFilePath(args).then((filePath) => {
           resolve(filePath);
         }).catch(() => {
-          resolve(DOWNLOAD_DIR);
+          resolve(this.downloadDir);
         });
       });
     });
@@ -132,9 +133,9 @@ export class DownloadService {
       const info = JSON.parse(infoResult.stdout);
       const title = info.title || "video";
       const ext = args.includes("--audio-format") ? "mp3" : "mp4";
-      return path.join(DOWNLOAD_DIR, `${title}.${ext}`);
+      return path.join(this.downloadDir, `${title}.${ext}`);
     }
 
-    return DOWNLOAD_DIR;
+    return this.downloadDir;
   }
 }
