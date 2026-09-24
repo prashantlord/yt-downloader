@@ -9,6 +9,7 @@ export interface VideoFormat {
   filesize?: number;
   filesizeApproximate?: number;
   formatNote?: string;
+  abr?: number;
 }
 
 export interface VideoInfo {

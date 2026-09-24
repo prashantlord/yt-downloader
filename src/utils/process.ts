@@ -7,6 +7,7 @@ export interface ProcessResult {
   code: number;
 }
 
+// Run a command and collect its stdout, stderr, and exit code
 export function runProcess(
   command: string,
   args: string[],
@@ -39,6 +40,7 @@ export function runProcess(
   });
 }
 
+// Run a command while parsing its percentage output to report progress
 export function runProcessWithProgress(
   command: string,
   args: string[],
@@ -84,6 +86,7 @@ export function runProcessWithProgress(
   });
 }
 
+// Ask the user a question and resolve their trimmed answer
 export function promptUser(question: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -96,4 +99,15 @@ export function promptUser(question: string): Promise<string> {
       resolve(answer.trim());
     });
   });
+}
+
+// Ask a download confirmation (y/n) until a valid answer is given
+export async function confirmDownload(question: string): Promise<boolean> {
+  while (true) {
+    const answer = (await promptUser(question)).toLowerCase();
+    if (answer === "y") return true;
+    if (answer === "n") return false;
+    // Re-prompt when the user enters anything other than y or n
+    console.log("invalid input: please enter y or n");
+  }
 }

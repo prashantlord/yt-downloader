@@ -3,9 +3,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+// Detect if the script is running inside WSL
 function isWsl(): boolean {
   if (process.platform !== "linux") return false;
   if (process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP) return true;
+  // Check the linux kernel release string for "microsoft"
   try {
     return os.release().toLowerCase().includes("microsoft");
   } catch {
@@ -13,6 +15,7 @@ function isWsl(): boolean {
   }
 }
 
+// Resolve the Windows Downloads folder when running from WSL
 function windowsDownloadsDir(): string | null {
   try {
     const result = spawnSync("cmd.exe", ["/C", "echo %USERNAME%"], {
@@ -20,6 +23,7 @@ function windowsDownloadsDir(): string | null {
       timeout: 5000,
     });
     const username = result.stdout?.trim();
+    // cmd.exe may not be available or returned an unresolved variable
     if (!username || username.includes("%")) return null;
 
     const dir = path.win32.join("/mnt/c/Users", username, "Downloads");
@@ -29,6 +33,7 @@ function windowsDownloadsDir(): string | null {
   }
 }
 
+// Read the Downloads folder path from the XDG user directories config
 function xdgDownloadsDir(): string | null {
   try {
     const configPath = path.join(
@@ -39,9 +44,11 @@ function xdgDownloadsDir(): string | null {
     if (!fs.existsSync(configPath)) return null;
 
     const content = fs.readFileSync(configPath, "utf8");
+    // Matches a line like: XDG_DOWNLOAD_DIR="$HOME/Downloads"
     const match = content.match(/^XDG_DOWNLOAD_DIR="(.+)"$/m);
     if (!match) return null;
 
+    // Expand $HOME and ~ into the real home directory
     const dir = match[1].replace(/\$\{HOME\}|~/g, os.homedir());
     return fs.existsSync(dir) ? dir : null;
   } catch {
@@ -49,6 +56,7 @@ function xdgDownloadsDir(): string | null {
   }
 }
 
+// Resolve and create the directory where downloads are saved
 export function getDownloadDir(): string {
   const fromEnv = process.env.DOWNLOAD_DIR;
   if (fromEnv) {

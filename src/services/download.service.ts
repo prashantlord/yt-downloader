@@ -7,6 +7,7 @@ export class DownloadService {
   private progressBar: CliProgress.SingleBar;
   private downloadDir: string;
 
+  // Set up the progress bar and resolve the download directory
   constructor() {
     this.progressBar = new CliProgress.SingleBar(
       {
@@ -20,6 +21,7 @@ export class DownloadService {
     this.downloadDir = getDownloadDir();
   }
 
+  // Download the video's best audio and extract/convert it to mp3
   async downloadMp3(url: string): Promise<string> {
     const args = [
       "-x",
@@ -36,6 +38,7 @@ export class DownloadService {
     return this.executeDownload(args);
   }
 
+  // Download the chosen video quality merged with the best audio as mp4
   async downloadMp4(url: string, formatId: string): Promise<string> {
     const args = [
       "-f",
@@ -51,12 +54,14 @@ export class DownloadService {
     return this.executeDownload(args);
   }
 
+  // Spawn yt-dlp, render a progress bar, and resolve the downloaded file path
   private executeDownload(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn("yt-dlp", args);
 
       let lastPercent = -1;
 
+      // Parse yt-dlp's "[download] 12.3%" and "at 5.2MiB/s" lines from stdout
       child.stdout.on("data", (data: Buffer) => {
         const output = data.toString();
         const percentMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
@@ -73,6 +78,7 @@ export class DownloadService {
         }
       });
 
+      // Same parsing for stderr, where yt-dlp may write progress lines
       child.stderr.on("data", (data: Buffer) => {
         const output = data.toString();
         const percentMatch = output.match(/(\d+\.?\d*)%/);
@@ -106,6 +112,7 @@ export class DownloadService {
           return;
         }
 
+        // The file exists after a successful download, so resolve its path
         this.getDownloadedFilePath(args).then((filePath) => {
           resolve(filePath);
         }).catch(() => {
@@ -115,6 +122,7 @@ export class DownloadService {
     });
   }
 
+  // Resolve the final output path by asking yt-dlp for the video title
   private async getDownloadedFilePath(args: string[]): Promise<string> {
     const url = args[args.length - 1];
     const infoArgs = ["-J", url];
@@ -132,6 +140,7 @@ export class DownloadService {
     if (infoResult.code === 0) {
       const info = JSON.parse(infoResult.stdout);
       const title = info.title || "video";
+      // The extension depends on whether the audio was extracted (mp3) or merged (mp4)
       const ext = args.includes("--audio-format") ? "mp3" : "mp4";
       return path.join(this.downloadDir, `${title}.${ext}`);
     }
