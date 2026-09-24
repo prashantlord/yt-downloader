@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # One-command setup for the youtube-dl CLI.
 #
-# 1. Checks Node.js, npm, yt-dlp, ffmpeg are present (and prints install
-#    commands for any that are missing).
-# 2. `npm install` (also builds dist/ automatically via the "prepare" script).
-# 3. Installs the `youtube` command GLOBALLY as a COPY (`npm install -g .`)
-#    so that you can delete the clone afterwards and the command keeps working.
-# 4. Verifies the install with `youtube --version`.
+# Assumes node, npm, yt-dlp and ffmpeg are already installed on the system.
+# Running this script will:
+#
+# 1. Install the project's npm dependencies (`npm install`).
+# 2. Build the project (`npm run build`) into dist/.
+# 3. Pack the project into a tarball and install the `youtube` command
+#    GLOBALLY from that tarball as a real COPY.
+#    Because a copy is installed (not a symlink), you can delete the clone
+#    afterwards and the command keeps working. Re-running the script simply
+#    overwrites the previous global install, so it also works as an update.
+# 4. Verify the install with `youtube --version`.
 set -euo pipefail
 
 RED='\033[31m'; YELLOW='\033[33m'; GREEN='\033[32m'; NC='\033[0m'
@@ -15,57 +20,32 @@ step()  { printf "${GREEN}==>${NC} %s\n" "$1"; }
 warn()  { printf "${YELLOW}[warn]${NC} %s\n" "$1"; }
 err()   { printf "${RED}[error]${NC} %s\n" "$1"; }
 
-check_cmd() {
-  local name="$1" hint="$2"
-  if command -v "$name" >/dev/null 2>&1; then
-    printf "${GREEN}[ok]${NC} %s\n" "$name"
-    return 0
-  fi
-  err "$name not found."
-  printf "     install it:\n"
-  printf "       %s\n" "$hint"
-  return 1
-}
+# --- 1. install npm dependencies (skip scripts; we build explicitly next) ---
+step "installing project dependencies..."
+npm install --ignore-scripts
 
-# --- 1. prerequisites -------------------------------------------------------
-step "checking prerequisites..."
+# --- 2. build the project into dist/ ---------------------------------------
+step "building the project..."
+npm run build
 
-npm_ok=0
-if command -v node >/dev/null 2>&1; then
-  node_major=$(node -p 'process.versions.node.split(".")[0]')
-  if [ "$node_major" -ge 18 ] 2>/dev/null; then
-    printf "${GREEN}[ok]${NC} node %s\n" "$(node --version)"
-    npm_ok=1
-  else
-    err "node >= 18 required (found $(node --version))."
-    printf "       install: nvm install node   (latest)\n"
-  fi
-else
-  err "node not found."
-  printf "       install: nvm install node   or   https://nodejs.org\n"
-fi
-
-missing=0
-check_cmd yt-dlp   "pip install -U yt-dlp"                  || missing=1
-check_cmd ffmpeg   "sudo apt install -y ffmpeg   # or brew install ffmpeg" || missing=1
-
-if [ "$npm_ok" -ne 1 ] || [ "$missing" -ne 0 ]; then
-  printf "\n${RED}missing prerequisites above. fix them and re-run ./setup.sh.${NC}\n"
-  exit 1
-fi
-
-# --- 2. dependencies + build ------------------------------------------------
-step "installing dependencies and building (npm install)..."
-npm install
-
-# --- 3. install globally as a copy ------------------------------------------
+# --- 3. install globally as a real copy via a packed tarball ----------------
+# `npm install -g .` would create a symlink to this folder, breaking the
+# command if the clone is deleted. Packing first guarantees a real copy and
+# cleanly replaces any previously installed version of this package.
 step "installing the 'youtube' command globally (as a copy)..."
-if ! npm install -g . 2>/tmp/youtube_setup_err.log; then
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+npm pack --pack-destination "$tmp_dir" --ignore-scripts >/dev/null
+
+if ! npm install -g "$tmp_dir"/*.tgz 2>/tmp/youtube_setup_err.log; then
   err "global install failed. the npm global prefix may not be writable."
-  printf "       try: sudo npm install -g .\n"
-  printf "       or set a user prefix:\n"
+  printf "       set a user-owned npm prefix and re-run:\n"
   printf "         npm config set prefix \"\$HOME/.local\"\n"
   printf "         export PATH=\"\$HOME/.local/bin:\$PATH\"\n"
+  printf "         ./setup.sh\n"
+  printf "       or (last resort) run the whole script with sudo:\n"
+  printf "         sudo ./setup.sh\n"
   tail -n 5 /tmp/youtube_setup_err.log
   exit 1
 fi
@@ -79,7 +59,9 @@ printf "  youtube mp3 <url>    download audio as mp3\n"
 printf "  youtube mp4 <url>    download video as mp4 (quality picker)\n"
 printf "  youtube --version    print version\n"
 printf "\n"
-printf "the clone can be deleted now; the 'youtube' command keeps working.\n"
+printf "the clone can be deleted now; 'youtube' is installed as a real copy and\n"
+printf "keeps working.\n"
+printf "to update after pulling new code, just re-run ./setup.sh.\n"
 printf "downloads go to:\n"
 printf "  - \$DOWNLOAD_DIR if set,\n"
 printf "  - your system Downloads folder otherwise.\n"
